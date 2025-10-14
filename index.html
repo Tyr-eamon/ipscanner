@@ -1,0 +1,211 @@
+<!-- Updated templates/index.html with file upload, two-column input for IP segments and IPs, and live updates -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Subnet & IP Scanner</title>
+<style>
+  body { font-family: Arial, sans-serif; margin: 2rem; }
+  input[type=text], textarea { width: 300px; padding: 0.5rem; vertical-align: top; }
+  textarea { height: 100px; resize: vertical; }
+  button { padding: 0.5rem 1rem; margin-left: 1rem; }
+  #progress { margin-top: 1rem; }
+  table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+  th, td { border: 1px solid #ddd; padding: 8px; vertical-align: top; }
+  th { background: #f4f4f4; }
+  #progressBarContainer { width: 100%; background: #eee; height: 20px; margin-top: 10px; display:none; }
+  #progressBar { height: 100%; width: 0%; background: #4caf50; }
+  #elapsedTime, #currentIP { margin-top: 5px; }
+  a.url-link { display: block; margin-bottom: 4px; color: #007bff; text-decoration: none; }
+  a.url-link:hover { text-decoration: underline; }
+  label { display: block; margin-top: 1rem; }
+</style>
+</head>
+<body>
+
+<h1>Subnet & IP Scanner</h1>
+
+<form id="scanForm" enctype="multipart/form-data">
+  <label for="fileInput">Upload IP/IP Segment File (two columns - subnet, ip):</label>
+  <input type="file" id="fileInput" name="ipfile" accept=".txt,.csv" />
+
+  <label for="subnetsInput">Subnet(s) (comma separated):</label>
+  <textarea id="subnetsInput" name="subnets" placeholder="192.168.1.0/24,10.0.0.0/24"></textarea>
+
+  <label for="ipsInput">Individual IP(s) (comma separated):</label>  
+  <textarea id="ipsInput" name="ips" placeholder="192.168.1.10,10.0.0.5"></textarea>
+
+  <button type="submit" id="startBtn">Start Scan</button>
+  <button type="button" id="stopBtn" disabled>Stop</button>
+</form>
+
+<div id="progress"></div>
+
+<div id="progressBarContainer">
+  <div id="progressBar"></div>
+</div>
+<div id="elapsedTime">Elapsed Time: 0s</div>
+<div id="currentIP">Current IP: -</div>
+
+<h2>IP & Open Ports</h2>
+<table id="ipPortTable" style="display:none;">
+  <thead>
+    <tr>
+      <th>IP Address</th>
+      <th>Open Ports</th>
+    </tr>
+  </thead>
+  <tbody id="ipPortBody"></tbody>
+</table>
+
+<h2>URLs</h2>
+<table id="urlTable" style="display:none;">
+  <thead>
+    <tr>
+      <th>URLs</th>
+    </tr>
+  </thead>
+  <tbody id="urlBody"></tbody>
+</table>
+
+<script>
+const form = document.getElementById('scanForm');
+const fileInput = document.getElementById('fileInput');
+const subnetsInput = document.getElementById('subnetsInput');
+const ipsInput = document.getElementById('ipsInput');
+const startBtn = document.getElementById('startBtn');
+const stopBtn = document.getElementById('stopBtn');
+const progressDiv = document.getElementById('progress');
+
+const progressBarContainer = document.getElementById('progressBarContainer');
+const progressBar = document.getElementById('progressBar');
+const elapsedTime = document.getElementById('elapsedTime');
+const currentIP = document.getElementById('currentIP');
+
+const ipPortTable = document.getElementById('ipPortTable');
+const ipPortBody = document.getElementById('ipPortBody');
+const urlTable = document.getElementById('urlTable');
+const urlBody = document.getElementById('urlBody');
+
+let eventSource;
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  startBtn.disabled = true;
+  stopBtn.disabled = false;
+
+  ipPortTable.style.display = 'none';
+  urlTable.style.display = 'none';
+  ipPortBody.innerHTML = '';
+  urlBody.innerHTML = '';
+  progressDiv.textContent = 'Starting scan...';
+  progressBarContainer.style.display = 'block';
+  progressBar.style.width = '0%';
+  elapsedTime.textContent = 'Elapsed Time: 0s';
+  currentIP.textContent = 'Current IP: -';
+
+  let formData = new FormData();
+  if (fileInput.files.length > 0) {
+    formData.append('ipfile', fileInput.files[0]);
+  }
+  formData.append('subnets', subnetsInput.value);
+  formData.append('ips', ipsInput.value);
+
+  await fetch('/start_scan', {
+    method: 'POST',
+    body: formData
+  });
+
+  if (eventSource) {
+    eventSource.close();
+  }
+  eventSource = new EventSource('/progress');
+
+  eventSource.onmessage = function(event) {
+    const data = JSON.parse(event.data);
+    if (data.type === 'progress') {
+      const percent = ((data.scanned / data.total) * 100).toFixed(2);
+      progressBar.style.width = percent + '%';
+      elapsedTime.textContent = 'Elapsed Time: ' + Math.floor(data.elapsed) + 's';
+      currentIP.textContent = 'Current IP: ' + data.current_ip;
+      progressDiv.textContent = `Scanning IP ${data.current_ip} (${data.scanned} / ${data.total})`;
+    } else if (data.type === 'live') {
+      // Live found open ports update - append row dynamically
+      let tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${data.ip}</td>
+        <td>${data.ports}</td>
+      `;
+      ipPortBody.appendChild(tr);
+      ipPortTable.style.display = 'table';
+
+      data.open_ports.forEach(portInfo => {
+        let urlRow = document.createElement('tr');
+        let td = document.createElement('td');
+        let a = document.createElement('a');
+        let scheme = portInfo[0] === 443 ? 'https' : 'http';
+        let url = `${scheme}://${data.ip}:${portInfo[0]}`;
+        a.href = url;
+        a.textContent = url;
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+        a.className = 'url-link';
+        td.appendChild(a);
+        urlRow.appendChild(td);
+        urlBody.appendChild(urlRow);
+      });
+      urlTable.style.display = 'table';
+
+    } else if (data.type === 'complete') {
+      eventSource.close();
+      progressDiv.textContent = 'Scan complete.';
+      startBtn.disabled = false;
+      stopBtn.disabled = true;
+      progressBarContainer.style.display = 'none';
+      elapsedTime.textContent = '';
+      currentIP.textContent = '';
+    } else if (data.type === 'stopped') {
+      eventSource.close();
+      progressDiv.textContent = 'Scan stopped by user.';
+      startBtn.disabled = false;
+      stopBtn.disabled = true;
+      progressBarContainer.style.display = 'none';
+      elapsedTime.textContent = '';
+      currentIP.textContent = '';
+    } else if (data.type === 'error') {
+      eventSource.close();
+      progressDiv.textContent = 'Error: ' + data.message;
+      startBtn.disabled = false;
+      stopBtn.disabled = true;
+      progressBarContainer.style.display = 'none';
+      elapsedTime.textContent = '';
+      currentIP.textContent = '';
+    }
+  };
+
+  eventSource.onerror = function() {
+    eventSource.close();
+    progressDiv.textContent = 'Connection lost.';
+    startBtn.disabled = false;
+    stopBtn.disabled = true;
+    progressBarContainer.style.display = 'none';
+    elapsedTime.textContent = '';
+    currentIP.textContent = '';
+  };
+});
+
+stopBtn.addEventListener('click', async () => {
+  stopBtn.disabled = true;
+  progressDiv.textContent = 'Stopping scan...';
+  try {
+    await fetch('/stop', { method: 'POST' });
+  } catch {
+    progressDiv.textContent = 'Failed to stop scan.';
+  }
+});
+</script>
+
+</body>
+</html>
