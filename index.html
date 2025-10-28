@@ -1,211 +1,805 @@
-<!-- Updated templates/index.html with file upload, two-column input for IP segments and IPs, and live updates -->
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Subnet & IP Scanner</title>
-<style>
-  body { font-family: Arial, sans-serif; margin: 2rem; }
-  input[type=text], textarea { width: 300px; padding: 0.5rem; vertical-align: top; }
-  textarea { height: 100px; resize: vertical; }
-  button { padding: 0.5rem 1rem; margin-left: 1rem; }
-  #progress { margin-top: 1rem; }
-  table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
-  th, td { border: 1px solid #ddd; padding: 8px; vertical-align: top; }
-  th { background: #f4f4f4; }
-  #progressBarContainer { width: 100%; background: #eee; height: 20px; margin-top: 10px; display:none; }
-  #progressBar { height: 100%; width: 0%; background: #4caf50; }
-  #elapsedTime, #currentIP { margin-top: 5px; }
-  a.url-link { display: block; margin-bottom: 4px; color: #007bff; text-decoration: none; }
-  a.url-link:hover { text-decoration: underline; }
-  label { display: block; margin-top: 1rem; }
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Subnet &amp; SOCKS5 Scanner</title>
+  <style>
+    :root {
+      --primary: #2563eb;
+      --primary-dark: #1d4ed8;
+      --danger: #dc2626;
+      --surface: #ffffff;
+      --accent: #dbeafe;
+      --muted: #64748b;
+      --border: #e2e8f0;
+      --shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Inter", "Segoe UI", sans-serif;
+      background: #f1f5f9;
+      color: #0f172a;
+    }
+
+    main {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem 3rem;
+    }
+
+    h1 {
+      margin-top: 0;
+      font-size: 2rem;
+      font-weight: 700;
+      margin-bottom: 1.5rem;
+    }
+
+    h2 {
+      font-size: 1.1rem;
+      margin: 0 0 0.75rem;
+      font-weight: 600;
+      color: #1e293b;
+    }
+
+    .card {
+      background: var(--surface);
+      padding: 1.35rem;
+      border-radius: 14px;
+      box-shadow: var(--shadow);
+    }
+
+    .form-grid {
+      display: grid;
+      gap: 1.2rem;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    }
+
+    label {
+      display: block;
+      font-size: 0.88rem;
+      font-weight: 600;
+      margin-bottom: 0.35rem;
+      color: #1f2937;
+    }
+
+    input[type="text"],
+    input[type="number"],
+    textarea,
+    select {
+      width: 100%;
+      padding: 0.6rem 0.75rem;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      font-size: 0.95rem;
+      font-family: inherit;
+      background: #f8fafc;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    input:focus,
+    textarea:focus,
+    select:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+      background: #fff;
+    }
+
+    textarea {
+      min-height: 120px;
+      resize: vertical;
+    }
+
+    .toggle {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      margin-bottom: 0.75rem;
+      font-size: 0.92rem;
+      color: #1f2937;
+    }
+
+    .toggle input[type="checkbox"] {
+      width: auto;
+      accent-color: var(--primary);
+    }
+
+    .hint {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-top: 0.35rem;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      align-items: center;
+      margin-top: 1.25rem;
+    }
+
+    button {
+      border: none;
+      border-radius: 999px;
+      padding: 0.7rem 1.8rem;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.2s ease;
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    #startBtn {
+      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+      color: #fff;
+      box-shadow: 0 8px 16px rgba(37, 99, 235, 0.25);
+    }
+
+    #startBtn:hover:not(:disabled) {
+      transform: translateY(-1px);
+    }
+
+    #stopBtn {
+      background: var(--danger);
+      color: #fff;
+      box-shadow: 0 8px 16px rgba(220, 38, 38, 0.18);
+    }
+
+    .progress-section {
+      margin-top: 1.75rem;
+      display: grid;
+      gap: 1rem;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    }
+
+    .progress-card {
+      background: var(--surface);
+      border-radius: 14px;
+      box-shadow: var(--shadow);
+      padding: 1rem 1.25rem;
+    }
+
+    .progress-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-weight: 600;
+    }
+
+    .progress-bar {
+      width: 100%;
+      height: 12px;
+      background: #e2e8f0;
+      border-radius: 999px;
+      overflow: hidden;
+      margin: 0.75rem 0;
+    }
+
+    .progress-bar span {
+      display: block;
+      height: 100%;
+      width: 0%;
+      background: var(--primary);
+      border-radius: inherit;
+      transition: width 0.25s ease;
+    }
+
+    .progress-meta {
+      display: grid;
+      gap: 0.25rem;
+      font-size: 0.86rem;
+      color: #1f2937;
+    }
+
+    .status {
+      margin-top: 1.5rem;
+      font-weight: 600;
+      color: #1e293b;
+    }
+
+    .status.error {
+      color: var(--danger);
+    }
+
+    .table-wrapper {
+      margin-top: 1.75rem;
+      background: var(--surface);
+      border-radius: 14px;
+      box-shadow: var(--shadow);
+      padding: 1.25rem;
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.95rem;
+    }
+
+    thead th {
+      text-align: left;
+      padding: 0.75rem 0.9rem;
+      background: #f8fafc;
+      font-weight: 600;
+      color: #334155;
+      border-bottom: 1px solid var(--border);
+    }
+
+    tbody td {
+      padding: 0.65rem 0.9rem;
+      border-bottom: 1px solid var(--border);
+      color: #1f2937;
+      vertical-align: top;
+      word-break: break-word;
+    }
+
+    tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    .url-cell {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    .url-text {
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      font-size: 0.9rem;
+      background: #eef2ff;
+      padding: 0.2rem 0.45rem;
+      border-radius: 6px;
+      color: #312e81;
+    }
+
+    .copy-btn {
+      padding: 0.25rem 0.75rem;
+      border-radius: 999px;
+      border: 1px solid #c7d2fe;
+      background: #e0e7ff;
+      color: #3730a3;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+
+    .copy-btn:hover {
+      background: #c7d2fe;
+    }
+
+    .notes {
+      max-width: 240px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      font-size: 0.74rem;
+      background: #e2e8f0;
+      color: #475569;
+      border-radius: 999px;
+      padding: 0.1rem 0.55rem;
+      margin-left: 0.4rem;
+    }
+
+    @media (max-width: 720px) {
+      h1 {
+        font-size: 1.7rem;
+      }
+      .progress-section {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
 </head>
 <body>
+  <main>
+    <h1>Subnet &amp; SOCKS5 Scanner</h1>
 
-<h1>Subnet & IP Scanner</h1>
+    <form id="scanForm" enctype="multipart/form-data">
+      <div class="form-grid">
+        <div class="card">
+          <h2>Input Targets</h2>
+          <label for="fileInput">Upload IP/IP Segment File</label>
+          <input type="file" id="fileInput" name="ipfile" accept=".txt,.csv" />
+          <p class="hint">Text or CSV with subnet/IP columns.</p>
 
-<form id="scanForm" enctype="multipart/form-data">
-  <label for="fileInput">Upload IP/IP Segment File (two columns - subnet, ip):</label>
-  <input type="file" id="fileInput" name="ipfile" accept=".txt,.csv" />
+          <label for="subnetsInput">Subnets (comma or newline separated)</label>
+          <textarea id="subnetsInput" name="subnets" placeholder="192.168.1.0/24, 10.0.0.0/24"></textarea>
 
-  <label for="subnetsInput">Subnet(s) (comma separated):</label>
-  <textarea id="subnetsInput" name="subnets" placeholder="192.168.1.0/24,10.0.0.0/24"></textarea>
+          <label for="ipsInput">Individual IPs</label>
+          <textarea id="ipsInput" name="ips" placeholder="192.168.1.10, 10.0.0.5"></textarea>
+        </div>
 
-  <label for="ipsInput">Individual IP(s) (comma separated):</label>  
-  <textarea id="ipsInput" name="ips" placeholder="192.168.1.10,10.0.0.5"></textarea>
+        <div class="card">
+          <h2>SOCKS5 URLs</h2>
+          <label for="socksUrls">SOCKS5 URLs (one per line)</label>
+          <textarea id="socksUrls" name="socks_urls" placeholder="socks5://user:pass@host:1080"></textarea>
+          <p class="hint">Supports socks5 &amp; socks5h schemes with optional credentials.</p>
+        </div>
 
-  <button type="submit" id="startBtn">Start Scan</button>
-  <button type="button" id="stopBtn" disabled>Stop</button>
-</form>
+        <div class="card">
+          <h2>SOCKS5 Options</h2>
+          <label for="socksPorts">Candidate ports for detection</label>
+          <input type="text" id="socksPorts" name="socks_ports" placeholder="1080,10000,11300" />
+          <p class="hint">Comma separated list. Persisted locally.</p>
 
-<div id="progress"></div>
+          <div class="toggle">
+            <input type="checkbox" id="detectSocks" name="detect_socks5" checked />
+            <label for="detectSocks">Detect SOCKS5 during port scan</label>
+          </div>
 
-<div id="progressBarContainer">
-  <div id="progressBar"></div>
-</div>
-<div id="elapsedTime">Elapsed Time: 0s</div>
-<div id="currentIP">Current IP: -</div>
+          <div class="toggle">
+            <input type="checkbox" id="validateConnect" name="validate_connect" checked />
+            <label for="validateConnect">Run CONNECT test after handshake</label>
+          </div>
 
-<h2>IP & Open Ports</h2>
-<table id="ipPortTable" style="display:none;">
-  <thead>
-    <tr>
-      <th>IP Address</th>
-      <th>Open Ports</th>
-    </tr>
-  </thead>
-  <tbody id="ipPortBody"></tbody>
-</table>
+          <label for="connectTargetSelect">CONNECT target</label>
+          <select id="connectTargetSelect">
+            <option value="1.1.1.1:53">1.1.1.1:53 (Cloudflare DNS)</option>
+            <option value="8.8.8.8:53">8.8.8.8:53 (Google DNS)</option>
+            <option value="9.9.9.9:53">9.9.9.9:53 (Quad9 DNS)</option>
+            <option value="custom">Custom…</option>
+          </select>
+          <input type="text" id="connectTarget" name="connect_target" placeholder="host:port" value="1.1.1.1:53" class="hint-input" />
 
-<h2>URLs</h2>
-<table id="urlTable" style="display:none;">
-  <thead>
-    <tr>
-      <th>URLs</th>
-    </tr>
-  </thead>
-  <tbody id="urlBody"></tbody>
-</table>
+          <label for="timeoutMs">Handshake timeout (ms)</label>
+          <input type="number" id="timeoutMs" name="timeout_ms" min="250" step="50" value="1500" />
 
-<script>
-const form = document.getElementById('scanForm');
-const fileInput = document.getElementById('fileInput');
-const subnetsInput = document.getElementById('subnetsInput');
-const ipsInput = document.getElementById('ipsInput');
-const startBtn = document.getElementById('startBtn');
-const stopBtn = document.getElementById('stopBtn');
-const progressDiv = document.getElementById('progress');
+          <label for="concurrency">Max concurrency for URL checks</label>
+          <input type="number" id="concurrency" name="max_concurrency" min="1" max="64" value="8" />
+        </div>
+      </div>
 
-const progressBarContainer = document.getElementById('progressBarContainer');
-const progressBar = document.getElementById('progressBar');
-const elapsedTime = document.getElementById('elapsedTime');
-const currentIP = document.getElementById('currentIP');
+      <div class="actions">
+        <button type="submit" id="startBtn">Start</button>
+        <button type="button" id="stopBtn" disabled>Stop</button>
+      </div>
+    </form>
 
-const ipPortTable = document.getElementById('ipPortTable');
-const ipPortBody = document.getElementById('ipPortBody');
-const urlTable = document.getElementById('urlTable');
-const urlBody = document.getElementById('urlBody');
+    <section class="progress-section">
+      <div class="progress-card" id="hostProgress" hidden>
+        <div class="progress-header">
+          <span>Host scan</span>
+          <span id="hostCount">0 / 0</span>
+        </div>
+        <div class="progress-bar"><span id="hostProgressBar"></span></div>
+        <div class="progress-meta">
+          <div><strong>Current:</strong> <span id="hostCurrent">-</span></div>
+          <div><strong>Elapsed:</strong> <span id="hostElapsed">0s</span></div>
+        </div>
+        <div class="hint" id="hostNotes" hidden></div>
+      </div>
 
-let eventSource;
+      <div class="progress-card" id="socksProgress" hidden>
+        <div class="progress-header">
+          <span>SOCKS5 verification</span>
+          <span id="socksCount">0 / 0</span>
+        </div>
+        <div class="progress-bar"><span id="socksProgressBar"></span></div>
+        <div class="progress-meta">
+          <div><strong>Current:</strong> <span id="socksCurrent">-</span></div>
+          <div><strong>Elapsed:</strong> <span id="socksElapsed">0s</span></div>
+        </div>
+      </div>
+    </section>
 
-form.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  startBtn.disabled = true;
-  stopBtn.disabled = false;
+    <div class="status" id="statusMessage">Idle.</div>
 
-  ipPortTable.style.display = 'none';
-  urlTable.style.display = 'none';
-  ipPortBody.innerHTML = '';
-  urlBody.innerHTML = '';
-  progressDiv.textContent = 'Starting scan...';
-  progressBarContainer.style.display = 'block';
-  progressBar.style.width = '0%';
-  elapsedTime.textContent = 'Elapsed Time: 0s';
-  currentIP.textContent = 'Current IP: -';
+    <div class="table-wrapper" id="ipSection" hidden>
+      <h2>Hosts &amp; open ports</h2>
+      <table id="ipPortTable">
+        <thead>
+          <tr>
+            <th>IP address</th>
+            <th>Open ports</th>
+          </tr>
+        </thead>
+        <tbody id="ipPortBody"></tbody>
+      </table>
+    </div>
 
-  let formData = new FormData();
-  if (fileInput.files.length > 0) {
-    formData.append('ipfile', fileInput.files[0]);
-  }
-  formData.append('subnets', subnetsInput.value);
-  formData.append('ips', ipsInput.value);
+    <div class="table-wrapper" id="urlsSection" hidden>
+      <h2>Quick links</h2>
+      <table id="urlTable">
+        <thead>
+          <tr>
+            <th>URL</th>
+          </tr>
+        </thead>
+        <tbody id="urlBody"></tbody>
+      </table>
+    </div>
 
-  await fetch('/start_scan', {
-    method: 'POST',
-    body: formData
-  });
+    <div class="table-wrapper" id="socksSection" hidden>
+      <h2>SOCKS5 verification results</h2>
+      <table id="socksTable">
+        <thead>
+          <tr>
+            <th>URL</th>
+            <th>Host</th>
+            <th>Port</th>
+            <th>Auth type</th>
+            <th>Auth result</th>
+            <th>CONNECT result</th>
+            <th>Latency (ms)</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody id="socksBody"></tbody>
+      </table>
+    </div>
+  </main>
 
-  if (eventSource) {
-    eventSource.close();
-  }
-  eventSource = new EventSource('/progress');
+  <script>
+    const form = document.getElementById('scanForm');
+    const fileInput = document.getElementById('fileInput');
+    const subnetsInput = document.getElementById('subnetsInput');
+    const ipsInput = document.getElementById('ipsInput');
+    const socksUrlsInput = document.getElementById('socksUrls');
+    const socksPortsInput = document.getElementById('socksPorts');
+    const detectSocksToggle = document.getElementById('detectSocks');
+    const validateConnectToggle = document.getElementById('validateConnect');
+    const connectTargetSelect = document.getElementById('connectTargetSelect');
+    const connectTargetInput = document.getElementById('connectTarget');
+    const timeoutInput = document.getElementById('timeoutMs');
+    const concurrencyInput = document.getElementById('concurrency');
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const statusMessage = document.getElementById('statusMessage');
 
-  eventSource.onmessage = function(event) {
-    const data = JSON.parse(event.data);
-    if (data.type === 'progress') {
-      const percent = ((data.scanned / data.total) * 100).toFixed(2);
-      progressBar.style.width = percent + '%';
-      elapsedTime.textContent = 'Elapsed Time: ' + Math.floor(data.elapsed) + 's';
-      currentIP.textContent = 'Current IP: ' + data.current_ip;
-      progressDiv.textContent = `Scanning IP ${data.current_ip} (${data.scanned} / ${data.total})`;
-    } else if (data.type === 'live') {
-      // Live found open ports update - append row dynamically
-      let tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td>${data.ip}</td>
-        <td>${data.ports}</td>
-      `;
-      ipPortBody.appendChild(tr);
-      ipPortTable.style.display = 'table';
+    const hostProgressCard = document.getElementById('hostProgress');
+    const hostProgressBar = document.getElementById('hostProgressBar');
+    const hostCount = document.getElementById('hostCount');
+    const hostCurrent = document.getElementById('hostCurrent');
+    const hostElapsed = document.getElementById('hostElapsed');
+    const hostNotes = document.getElementById('hostNotes');
 
-      data.open_ports.forEach(portInfo => {
-        let urlRow = document.createElement('tr');
-        let td = document.createElement('td');
-        let a = document.createElement('a');
-        let scheme = portInfo[0] === 443 ? 'https' : 'http';
-        let url = `${scheme}://${data.ip}:${portInfo[0]}`;
-        a.href = url;
-        a.textContent = url;
-        a.target = '_blank';
-        a.rel = 'noopener noreferrer';
-        a.className = 'url-link';
-        td.appendChild(a);
-        urlRow.appendChild(td);
-        urlBody.appendChild(urlRow);
-      });
-      urlTable.style.display = 'table';
+    const socksProgressCard = document.getElementById('socksProgress');
+    const socksProgressBar = document.getElementById('socksProgressBar');
+    const socksCount = document.getElementById('socksCount');
+    const socksCurrent = document.getElementById('socksCurrent');
+    const socksElapsed = document.getElementById('socksElapsed');
 
-    } else if (data.type === 'complete') {
-      eventSource.close();
-      progressDiv.textContent = 'Scan complete.';
-      startBtn.disabled = false;
-      stopBtn.disabled = true;
-      progressBarContainer.style.display = 'none';
-      elapsedTime.textContent = '';
-      currentIP.textContent = '';
-    } else if (data.type === 'stopped') {
-      eventSource.close();
-      progressDiv.textContent = 'Scan stopped by user.';
-      startBtn.disabled = false;
-      stopBtn.disabled = true;
-      progressBarContainer.style.display = 'none';
-      elapsedTime.textContent = '';
-      currentIP.textContent = '';
-    } else if (data.type === 'error') {
-      eventSource.close();
-      progressDiv.textContent = 'Error: ' + data.message;
-      startBtn.disabled = false;
-      stopBtn.disabled = true;
-      progressBarContainer.style.display = 'none';
-      elapsedTime.textContent = '';
-      currentIP.textContent = '';
+    const ipSection = document.getElementById('ipSection');
+    const ipPortBody = document.getElementById('ipPortBody');
+    const urlsSection = document.getElementById('urlsSection');
+    const urlBody = document.getElementById('urlBody');
+    const socksSection = document.getElementById('socksSection');
+    const socksBody = document.getElementById('socksBody');
+
+    const DEFAULT_PORTS = '1080,10000,11300';
+    const DEFAULT_TIMEOUT = 1500;
+
+    let eventSource = null;
+    let isRunning = false;
+
+    function escapeHtml(value) {
+      if (value == null) {
+        return '';
+      }
+      return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
     }
-  };
 
-  eventSource.onerror = function() {
-    eventSource.close();
-    progressDiv.textContent = 'Connection lost.';
-    startBtn.disabled = false;
-    stopBtn.disabled = true;
-    progressBarContainer.style.display = 'none';
-    elapsedTime.textContent = '';
-    currentIP.textContent = '';
-  };
-});
+    function formatElapsed(seconds) {
+      if (!seconds || seconds < 0) {
+        return '0s';
+      }
+      const rounded = Math.floor(seconds);
+      const mins = Math.floor(rounded / 60);
+      const secs = rounded % 60;
+      if (mins === 0) {
+        return `${secs}s`;
+      }
+      return `${mins}m ${secs.toString().padStart(2, '0')}s`;
+    }
 
-stopBtn.addEventListener('click', async () => {
-  stopBtn.disabled = true;
-  progressDiv.textContent = 'Stopping scan...';
-  try {
-    await fetch('/stop', { method: 'POST' });
-  } catch {
-    progressDiv.textContent = 'Failed to stop scan.';
-  }
-});
-</script>
+    function truncate(value, max = 60) {
+      if (!value) return '';
+      if (value.length <= max) return value;
+      return value.slice(0, max - 1) + '…';
+    }
 
+    function resetUi() {
+      statusMessage.textContent = 'Starting…';
+      statusMessage.classList.remove('error');
+      hostProgressCard.hidden = true;
+      hostProgressBar.style.width = '0%';
+      hostCount.textContent = '0 / 0';
+      hostCurrent.textContent = '-';
+      hostElapsed.textContent = '0s';
+      hostNotes.hidden = true;
+      hostNotes.textContent = '';
+
+      socksProgressCard.hidden = true;
+      socksProgressBar.style.width = '0%';
+      socksCount.textContent = '0 / 0';
+      socksCurrent.textContent = '-';
+      socksElapsed.textContent = '0s';
+
+      ipSection.hidden = true;
+      urlsSection.hidden = true;
+      socksSection.hidden = true;
+      ipPortBody.innerHTML = '';
+      urlBody.innerHTML = '';
+      socksBody.innerHTML = '';
+    }
+
+    function updateStatus(message, isError = false) {
+      statusMessage.textContent = message;
+      statusMessage.classList.toggle('error', !!isError);
+    }
+
+    function updateHostProgress(data) {
+      hostProgressCard.hidden = false;
+      const total = data.total || 0;
+      const displayCompleted = data.current && total
+        ? Math.min(data.completed + 1, total)
+        : Math.min(data.completed, total);
+      const percent = total ? Math.min(100, Math.round((displayCompleted / total) * 100)) : 0;
+      hostProgressBar.style.width = `${percent}%`;
+      hostCount.textContent = total ? `${displayCompleted} / ${total}` : '0 / 0';
+      hostCurrent.textContent = data.current || '-';
+      hostElapsed.textContent = formatElapsed(data.elapsed);
+    }
+
+    function updateSocksProgress(data) {
+      socksProgressCard.hidden = false;
+      const total = data.total || 0;
+      const displayCompleted = Math.min(data.completed, total);
+      const percent = total ? Math.min(100, Math.round((displayCompleted / total) * 100)) : 0;
+      socksProgressBar.style.width = `${percent}%`;
+      socksCount.textContent = total ? `${displayCompleted} / ${total}` : '0 / 0';
+      const currentDisplay = data.current ? truncate(data.current, 85) : '-';
+      socksCurrent.textContent = currentDisplay;
+      socksElapsed.textContent = formatElapsed(data.elapsed);
+    }
+
+    function addIpRow(data) {
+      ipSection.hidden = false;
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${escapeHtml(data.ip)}</td><td>${escapeHtml(data.ports)}</td>`;
+      ipPortBody.appendChild(tr);
+
+      if (Array.isArray(data.open_ports)) {
+        urlsSection.hidden = false;
+        data.open_ports.forEach((portInfo) => {
+          const [port] = portInfo;
+          const scheme = port === 443 ? 'https' : 'http';
+          const url = `${scheme}://${data.ip}:${port}`;
+          const row = document.createElement('tr');
+          row.innerHTML = `<td><a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(url)}</a></td>`;
+          urlBody.appendChild(row);
+        });
+      }
+    }
+
+    function addSocksResult(result) {
+      socksSection.hidden = false;
+      const normalized = result.normalized_url || '';
+      const notesParts = [];
+      if (result.notes) {
+        notesParts.push(result.notes);
+      }
+      if (result.source === 'port-scan') {
+        notesParts.push('Detected during port scan');
+      }
+      const notesText = notesParts.join(' | ');
+      const latency = typeof result.latency_ms === 'number' && result.latency_ms >= 0
+        ? result.latency_ms
+        : '';
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td>
+          <div class="url-cell">
+            <span class="url-text">${normalized ? escapeHtml(normalized) : '—'}</span>
+            ${normalized ? `<button class="copy-btn" data-url="${escapeHtml(normalized)}">Copy</button>` : ''}
+          </div>
+        </td>
+        <td>${escapeHtml(result.host ?? '-')}${result.scheme === 'socks5h' ? '<span class="badge">resolve remote</span>' : ''}</td>
+        <td>${escapeHtml(result.port ?? '-')}</td>
+        <td>${escapeHtml(result.auth_type ?? '-')}</td>
+        <td>${escapeHtml(result.auth_result ?? '-')}</td>
+        <td>${escapeHtml(result.connect_result ?? '-')}</td>
+        <td>${latency !== '' ? escapeHtml(latency) : '-'}</td>
+        <td class="notes">${notesText ? escapeHtml(notesText) : '—'}</td>
+      `;
+      socksBody.appendChild(row);
+    }
+
+    function closeEventStream() {
+      if (eventSource) {
+        eventSource.close();
+        eventSource = null;
+      }
+    }
+
+    connectTargetSelect.addEventListener('change', () => {
+      const value = connectTargetSelect.value;
+      if (value === 'custom') {
+        connectTargetInput.value = '';
+        connectTargetInput.focus();
+        return;
+      }
+      connectTargetInput.value = value;
+    });
+
+    socksPortsInput.addEventListener('input', () => {
+      localStorage.setItem('socksCandidatePorts', socksPortsInput.value);
+    });
+
+    document.addEventListener('click', (event) => {
+      const target = event.target;
+      if (target && target.classList.contains('copy-btn')) {
+        const url = target.getAttribute('data-url');
+        if (!url) return;
+        navigator.clipboard?.writeText(url).then(() => {
+          target.textContent = 'Copied';
+          setTimeout(() => {
+            target.textContent = 'Copy';
+          }, 1200);
+        });
+      }
+    });
+
+    function initialiseDefaults() {
+      const storedPorts = localStorage.getItem('socksCandidatePorts');
+      socksPortsInput.value = storedPorts || DEFAULT_PORTS;
+      if (!timeoutInput.value) {
+        timeoutInput.value = DEFAULT_TIMEOUT;
+      }
+      detectSocksToggle.checked = true;
+      validateConnectToggle.checked = true;
+      connectTargetInput.value = connectTargetSelect.value;
+    }
+
+    initialiseDefaults();
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (isRunning) {
+        return;
+      }
+      resetUi();
+      isRunning = true;
+      startBtn.disabled = true;
+      stopBtn.disabled = false;
+
+      const formData = new FormData();
+      if (fileInput.files.length > 0) {
+        formData.append('ipfile', fileInput.files[0]);
+      }
+      formData.append('subnets', subnetsInput.value);
+      formData.append('ips', ipsInput.value);
+      formData.append('socks_urls', socksUrlsInput.value);
+      formData.append('socks_ports', socksPortsInput.value || DEFAULT_PORTS);
+      formData.append('detect_socks5', detectSocksToggle.checked ? '1' : '0');
+      formData.append('validate_connect', validateConnectToggle.checked ? '1' : '0');
+      formData.append('connect_target', connectTargetInput.value.trim());
+      formData.append('timeout_ms', timeoutInput.value || DEFAULT_TIMEOUT);
+      formData.append('max_concurrency', concurrencyInput.value || '8');
+
+      try {
+        const response = await fetch('/start_scan', {
+          method: 'POST',
+          body: formData
+        });
+        if (!response.ok) {
+          throw new Error(`Request failed (${response.status})`);
+        }
+        const payload = await response.json();
+        if (!payload.started) {
+          throw new Error('Scanner did not start');
+        }
+      } catch (err) {
+        updateStatus(`Failed to start: ${err.message}`, true);
+        startBtn.disabled = false;
+        stopBtn.disabled = true;
+        isRunning = false;
+        return;
+      }
+
+      closeEventStream();
+      eventSource = new EventSource('/progress');
+
+      eventSource.onmessage = (messageEvent) => {
+        if (!messageEvent.data) {
+          return;
+        }
+        const data = JSON.parse(messageEvent.data);
+        switch (data.type) {
+          case 'progress':
+            if (data.context === 'host_scan') {
+              updateHostProgress(data);
+            } else if (data.context === 'socks_verify') {
+              updateSocksProgress(data);
+            }
+            break;
+          case 'live':
+            addIpRow(data);
+            break;
+          case 'socks_result':
+            addSocksResult(data);
+            break;
+          case 'phase_complete':
+            if (data.context === 'host_scan') {
+              if (Array.isArray(data.invalid_subnets) && data.invalid_subnets.length) {
+                hostNotes.hidden = false;
+                hostNotes.textContent = `Invalid subnets skipped: ${data.invalid_subnets.join(', ')}`;
+              }
+            } else if (data.context === 'socks_verify') {
+              updateStatus('SOCKS5 verification finished.');
+            }
+            break;
+          case 'complete':
+            updateStatus('All tasks complete.');
+            closeEventStream();
+            startBtn.disabled = false;
+            stopBtn.disabled = true;
+            isRunning = false;
+            break;
+          case 'stopped':
+            updateStatus('Scan stopped by user.');
+            closeEventStream();
+            startBtn.disabled = false;
+            stopBtn.disabled = true;
+            isRunning = false;
+            break;
+          case 'error':
+            updateStatus(`Error: ${data.message}`, true);
+            closeEventStream();
+            startBtn.disabled = false;
+            stopBtn.disabled = true;
+            isRunning = false;
+            break;
+          default:
+            break;
+        }
+      };
+
+      eventSource.onerror = () => {
+        closeEventStream();
+        if (isRunning) {
+          updateStatus('Connection to server lost.', true);
+          startBtn.disabled = false;
+          stopBtn.disabled = true;
+          isRunning = false;
+        }
+      };
+    });
+
+    stopBtn.addEventListener('click', async () => {
+      if (!isRunning) {
+        return;
+      }
+      stopBtn.disabled = true;
+      updateStatus('Stop requested…');
+      try {
+        await fetch('/stop', { method: 'POST' });
+      } catch (err) {
+        updateStatus(`Failed to stop: ${err.message}`, true);
+      }
+    });
+  </script>
 </body>
 </html>
